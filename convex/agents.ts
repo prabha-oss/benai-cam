@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 
 // List all agents, sorted by creation date (newest first)
 export const list = query({
@@ -15,6 +15,14 @@ export const list = query({
 
 // Get single agent by ID
 export const get = query({
+    args: { id: v.id("agents") },
+    handler: async (ctx, args) => {
+        return await ctx.db.get(args.id);
+    },
+});
+
+// Internal query for use by actions
+export const getInternal = internalQuery({
     args: { id: v.id("agents") },
     handler: async (ctx, args) => {
         return await ctx.db.get(args.id);
@@ -78,6 +86,7 @@ export const create = mutation({
 
         const agentId = await ctx.db.insert("agents", {
             ...args,
+            isActive: true, // New agents are active by default
             createdAt: Date.now(),
             updatedAt: Date.now(),
         });
@@ -92,6 +101,47 @@ export const create = mutation({
         });
 
         return agentId;
+    },
+});
+
+// Update an agent
+export const update = mutation({
+    args: {
+        id: v.id("agents"),
+        name: v.optional(v.string()),
+        description: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const agent = await ctx.db.get(args.id);
+        if (!agent) throw new Error("Agent not found");
+
+        // If name is being changed, check for duplicates
+        if (args.name && args.name !== agent.name) {
+            const existing = await ctx.db
+                .query("agents")
+                .withIndex("by_name", (q) => q.eq("name", args.name!))
+                .first();
+            if (existing && !existing.deletedAt) {
+                throw new Error(`Agent with name "${args.name}" already exists.`);
+            }
+        }
+
+        const updates: any = { updatedAt: Date.now() };
+        if (args.name !== undefined) updates.name = args.name;
+        if (args.description !== undefined) updates.description = args.description;
+
+        await ctx.db.patch(args.id, updates);
+
+        // Log activity
+        await ctx.db.insert("activityLog", {
+            entityType: "agent",
+            entityId: args.id,
+            action: "updated",
+            description: `Updated agent "${args.name || agent.name}"`,
+            timestamp: Date.now(),
+        });
+
+        return args.id;
     },
 });
 
@@ -129,5 +179,31 @@ export const remove = mutation({
 
         // Correction: I can't easily edit the log in insert above, but I'll fix the logic here.
         // Ideally entityId is the ID string.
+    },
+});
+
+// Toggle agent active status
+export const setActive = mutation({
+    args: {
+        id: v.id("agents"),
+        isActive: v.boolean(),
+    },
+    handler: async (ctx, args) => {
+        const agent = await ctx.db.get(args.id);
+        if (!agent) throw new Error("Agent not found");
+
+        await ctx.db.patch(args.id, {
+            isActive: args.isActive,
+            updatedAt: Date.now(),
+        });
+
+        // Log activity
+        await ctx.db.insert("activityLog", {
+            entityType: "agent",
+            entityId: args.id,
+            action: args.isActive ? "activated" : "deactivated",
+            description: `${args.isActive ? "Activated" : "Deactivated"} agent "${agent.name}"`,
+            timestamp: Date.now(),
+        });
     },
 });

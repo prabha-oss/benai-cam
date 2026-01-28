@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Upload, AlertCircle, Loader2, Search, Workflow, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Upload, AlertCircle, Loader2, Search, Workflow, RefreshCw, Plus } from "lucide-react";
 import { extractCredentials, CredentialSchema } from "@/lib/agents/credentialExtractor";
 
 interface N8nWorkflow {
@@ -282,8 +282,8 @@ export default function NewAgentPage() {
                                                         <span className="font-medium text-sm">{wf.name}</span>
                                                     </div>
                                                     <span className={`text-xs px-2 py-1 rounded-full ${wf.active
-                                                            ? "bg-green-100 text-green-700"
-                                                            : "bg-gray-100 text-gray-600"
+                                                        ? "bg-green-100 text-green-700"
+                                                        : "bg-gray-100 text-gray-600"
                                                         }`}>
                                                         {wf.active ? "Active" : "Inactive"}
                                                     </span>
@@ -387,6 +387,49 @@ export default function NewAgentPage() {
                                         <p>No credentials detected in this workflow.</p>
                                     </div>
                                 )}
+
+                                {/* Add Manual Credential Section */}
+                                <div className="mt-6 pt-6 border-t">
+                                    <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">
+                                        Add Manual Credentials
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Add credentials that weren't auto-detected from the workflow.
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const credName = prompt("Credential Name (e.g., 'Custom API Key'):");
+                                            if (!credName) return;
+                                            const credType = prompt("Credential Type (e.g., 'apiKey', 'httpHeaderAuth'):", "customCredential");
+                                            if (!credType) return;
+
+                                            // Add to parsedSchema
+                                            setParsedSchema((prev) => {
+                                                if (!prev) return prev;
+                                                return {
+                                                    ...prev,
+                                                    simple: [
+                                                        ...prev.simple,
+                                                        {
+                                                            type: credType,
+                                                            displayName: credName,
+                                                            instances: 1,
+                                                            fields: [
+                                                                { name: 'value', label: 'Credential Value', type: 'password' as const, required: true }
+                                                            ]
+                                                        }
+                                                    ]
+                                                };
+                                            });
+                                            toast.success(`Added "${credName}" credential`);
+                                        }}
+                                    >
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add Manual Credential
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     )}

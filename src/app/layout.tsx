@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Sidebar } from "@/components/Sidebar";
+import { AppLayout } from "@/components/AppLayout";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const manrope = Manrope({
+    subsets: ["latin"],
+    weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata: Metadata = {
     title: "BenAI Client Deployment Manager",
@@ -18,14 +22,14 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
-            <body className={inter.className}>
+        <html lang="en" suppressHydrationWarning>
+            <body className={manrope.className} suppressHydrationWarning>
                 <ConvexClientProvider>
                     <div className="flex min-h-screen bg-background text-foreground">
                         <Sidebar />
-                        <main className="flex-1 ml-64">
+                        <AppLayout>
                             {children}
-                        </main>
+                        </AppLayout>
                     </div>
                     <Toaster />
                 </ConvexClientProvider>

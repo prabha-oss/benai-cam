@@ -54,6 +54,9 @@ export default defineSchema({
             }))
         })),
 
+        // Status
+        isActive: v.optional(v.boolean()), // Active/Inactive toggle (defaults to true)
+
         // Metadata
         createdAt: v.number(),
         updatedAt: v.number(),
@@ -62,9 +65,10 @@ export default defineSchema({
         .index("by_name", ["name"])
         .index("by_created", ["createdAt"])
         .index("by_deleted", ["deletedAt"])
+        .index("by_active", ["isActive"])
         .searchIndex("search_name", {
             searchField: "name",
-            filterFields: ["deletedAt"]
+            filterFields: ["deletedAt", "isActive"]
         }),
 
     // ============================================================
@@ -122,6 +126,10 @@ export default defineSchema({
             v.literal("client_instance"),
             v.literal("your_instance")
         ),
+
+        // n8n Instance Config (for client_instance deployments)
+        n8nInstanceUrl: v.optional(v.string()),
+        n8nApiKey: v.optional(v.string()), // Consider encrypting in production
 
         // n8n References
         workflowId: v.string(), // n8n workflow ID

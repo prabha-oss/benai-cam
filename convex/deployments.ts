@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 
 // List all deployments with client and agent info
 export const list = query({
@@ -85,6 +85,9 @@ export const create = mutation({
             status: v.string(), // "active" | "needs_refresh"
             createdAt: v.number(),
         })),
+        // Optional n8n credentials for client_instance deployments
+        n8nUrl: v.optional(v.string()),
+        n8nApiKey: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         // Check if deployment already exists for this pair?
@@ -100,10 +103,6 @@ export const create = mutation({
             throw new Error("This agent is already deployed to this client.");
         }
 
-        // Cast string to union types for storage if needed, but schema defined string union so string input is validated at runtime by Convex if it matches
-        // Wait, schema used v.union for status. The arg we passed is string. 
-        // We should cast or ensure the input matches.
-
         // Deployment Type validation
         if (args.deploymentType !== 'client_instance' && args.deploymentType !== 'your_instance') {
             throw new Error("Invalid deployment type");
@@ -113,6 +112,9 @@ export const create = mutation({
             clientId: args.clientId,
             agentId: args.agentId,
             deploymentType: args.deploymentType as "client_instance" | "your_instance",
+            // Store n8n credentials for client_instance deployments
+            n8nInstanceUrl: args.n8nUrl,
+            n8nApiKey: args.n8nApiKey,
             workflowId: args.workflowId,
             workflowName: args.workflowName,
             workflowUrl: "", // Optional
@@ -120,7 +122,7 @@ export const create = mutation({
                 ...c,
                 status: c.status as "active" | "needs_refresh" | "failed" // casting
             })),
-            status: "deployed",
+            status: "deploying", // Start as deploying, action will update to deployed/failed
             health: {
                 lastChecked: Date.now(),
                 isHealthy: true, // Optimistic init
@@ -136,11 +138,64 @@ export const create = mutation({
         await ctx.db.insert("activityLog", {
             entityType: "deployment",
             entityId: deploymentId,
-            action: "deployed",
-            description: `Deployed agent to client`,
+            action: "deploying",
+            description: `Started deploying agent to client`,
             timestamp: Date.now(),
         });
 
         return deploymentId;
     }
+});
+
+// Update deployment status (internal use by actions)
+export const updateStatus = internalMutation({
+    args: {
+        id: v.id("deployments"),
+        status: v.string(), // "deployed" | "deploying" | "failed" | "archived"
+        error: v.optional(v.string()),
+        workflowId: v.optional(v.string()),
+        workflowUrl: v.optional(v.string())
+    },
+    handler: async (ctx, args) => {
+        const updates: any = {
+            status: args.status,
+            updatedAt: Date.now()
+        };
+
+        if (args.error) updates.deploymentError = args.error;
+        if (args.workflowId) updates.workflowId = args.workflowId;
+        if (args.workflowUrl) updates.workflowUrl = args.workflowUrl;
+
+        await ctx.db.patch(args.id, updates);
+    }
+});
+
+// Update deployment health (internal use by actions)
+export const updateHealth = internalMutation({
+    args: {
+        id: v.id("deployments"),
+        isHealthy: v.boolean(),
+        error: v.optional(v.string())
+    },
+    handler: async (ctx, args) => {
+        const deployment = await ctx.db.get(args.id);
+        if (!deployment) return;
+
+        // Simplified health update for now, ideally merge with health.ts logic
+        await ctx.db.patch(args.id, {
+            health: {
+                ...deployment.health,
+                lastChecked: Date.now(),
+                isHealthy: args.isHealthy
+            }
+        });
+    }
+});
+
+// Internal query to get deployment for actions
+export const getInternal = internalQuery({
+    args: { id: v.id("deployments") },
+    handler: async (ctx, args) => {
+        return await ctx.db.get(args.id);
+    },
 });

@@ -8,9 +8,12 @@
  * @module
  */
 
+import type * as actions from "../actions.js";
 import type * as agents from "../agents.js";
 import type * as clients from "../clients.js";
 import type * as deployments from "../deployments.js";
+import type * as health from "../health.js";
+import type * as notifications from "../notifications.js";
 import type * as settings from "../settings.js";
 
 import type {
@@ -20,9 +23,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  actions: typeof actions;
   agents: typeof agents;
   clients: typeof clients;
   deployments: typeof deployments;
+  health: typeof health;
+  notifications: typeof notifications;
   settings: typeof settings;
 }>;
 

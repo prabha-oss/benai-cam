@@ -6,21 +6,40 @@ export interface CredentialField {
     default?: string;
 }
 
-export interface Credential {
+export interface SimpleCredential {
     type: string;
     displayName: string;
     instances: number;
     fields: CredentialField[];
-    keyword?: string;
 }
 
+export interface SpecialCredential {
+    type: string;
+    displayName: string;
+    instances: number;
+    fields: CredentialField[];
+    keyword: string; // Required for special credentials
+}
+
+// Union type for internal use
+export type Credential = SimpleCredential | SpecialCredential;
+
 export interface CredentialSchema {
-    simple: Credential[];
-    special: Credential[];
+    simple: SimpleCredential[];
+    special: SpecialCredential[];
 }
 
 export function extractCredentials(workflowJSON: any): CredentialSchema {
-    const credentialMap = new Map<string, Credential>();
+    // Internal type for building the map
+    interface InternalCredential {
+        type: string;
+        displayName: string;
+        instances: number;
+        fields: CredentialField[];
+        keyword?: string;
+    }
+
+    const credentialMap = new Map<string, InternalCredential>();
 
     if (!workflowJSON.nodes || !Array.isArray(workflowJSON.nodes)) {
         throw new Error("Invalid workflow JSON: missing 'nodes' array");
@@ -61,15 +80,26 @@ export function extractCredentials(workflowJSON: any): CredentialSchema {
         }
     }
 
-    // Step 3: Categorize into simple vs special
-    const simple: Credential[] = [];
-    const special: Credential[] = [];
+    // Step 3: Categorize into simple vs special with proper types
+    const simple: SimpleCredential[] = [];
+    const special: SpecialCredential[] = [];
 
     for (const cred of credentialMap.values()) {
-        if (isSpecialType(cred.type)) {
-            special.push(cred);
+        if (isSpecialType(cred.type) && cred.keyword !== undefined) {
+            special.push({
+                type: cred.type,
+                displayName: cred.displayName,
+                instances: cred.instances,
+                fields: cred.fields,
+                keyword: cred.keyword,
+            });
         } else {
-            simple.push(cred);
+            simple.push({
+                type: cred.type,
+                displayName: cred.displayName,
+                instances: cred.instances,
+                fields: cred.fields,
+            });
         }
     }
 
