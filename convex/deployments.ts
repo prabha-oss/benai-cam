@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 
 // List all deployments with client and agent info
@@ -133,42 +133,47 @@ export const create = mutation({
             throw new Error("Invalid deployment type");
         }
 
-        const deploymentId = await ctx.db.insert("deployments", {
-            clientId: args.clientId,
-            agentId: args.agentId,
-            deploymentType: args.deploymentType as "client_instance" | "your_instance",
-            // Store n8n credentials for client_instance deployments
-            n8nInstanceUrl: args.n8nUrl,
-            n8nApiKey: args.n8nApiKey,
-            workflowId: args.workflowId,
-            workflowName: args.workflowName,
-            workflowUrl: "", // Optional
-            credentials: args.credentials.map(c => ({
-                ...c,
-                status: c.status as "active" | "needs_refresh" | "failed" | "archived" // casting
-            })),
-            status: "deploying", // Start as deploying, action will update to deployed/failed
-            health: {
-                lastChecked: Date.now(),
-                isHealthy: true, // Optimistic init
-                errorCount: 0,
-                consecutiveErrors: 0,
-                errors: []
-            },
-            deployedAt: Date.now(),
-            updatedAt: Date.now(),
-        });
+        try {
+            const deploymentId = await ctx.db.insert("deployments", {
+                clientId: args.clientId,
+                agentId: args.agentId,
+                deploymentType: args.deploymentType as "client_instance" | "your_instance",
+                // Store n8n credentials for client_instance deployments
+                n8nInstanceUrl: args.n8nUrl,
+                n8nApiKey: args.n8nApiKey,
+                workflowId: args.workflowId,
+                workflowName: args.workflowName,
+                workflowUrl: "", // Optional
+                credentials: args.credentials.map(c => ({
+                    ...c,
+                    status: c.status as "active" | "needs_refresh" | "failed" | "archived" // casting
+                })),
+                status: "deploying", // Start as deploying, action will update to deployed/failed
+                health: {
+                    lastChecked: Date.now(),
+                    isHealthy: true, // Optimistic init
+                    errorCount: 0,
+                    consecutiveErrors: 0,
+                    errors: []
+                },
+                deployedAt: Date.now(),
+                updatedAt: Date.now(),
+            });
 
-        // Log activity
-        await ctx.db.insert("activityLog", {
-            entityType: "deployment",
-            entityId: deploymentId,
-            action: "deploying",
-            description: `Started deploying agent to client`,
-            timestamp: Date.now(),
-        });
+            // Log activity
+            await ctx.db.insert("activityLog", {
+                entityType: "deployment",
+                entityId: deploymentId,
+                action: "deploying",
+                description: `Started deploying agent to client`,
+                timestamp: Date.now(),
+            });
 
-        return deploymentId;
+            return deploymentId;
+        } catch (error: any) {
+            console.error("Deployment creation failed:", error);
+            throw new ConvexError(`Failed to create deployment record: ${error.message}`);
+        }
     }
 });
 
