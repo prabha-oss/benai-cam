@@ -269,6 +269,8 @@ export const updateCredentials = mutation({
             type: v.string(),
             status: v.union(v.literal("active"), v.literal("needs_refresh"), v.literal("failed"), v.literal("archived")),
             createdAt: v.number(),
+            values: v.optional(v.any()),
+            encryptedValue: v.optional(v.string()),
             updatedAt: v.optional(v.number()),
             expiresAt: v.optional(v.number()),
         })),
