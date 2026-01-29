@@ -100,7 +100,7 @@ export const create = mutation({
             n8nCredentialId: v.string(),
             displayName: v.string(),
             type: v.string(),
-            status: v.string(), // "active" | "needs_refresh"
+            status: v.union(v.literal("active"), v.literal("needs_refresh"), v.literal("failed"), v.literal("archived")),
             createdAt: v.number(),
             values: v.optional(v.any()), // Optional credential values from deployment
             encryptedValue: v.optional(v.string()), // Optional encrypted credential value
@@ -145,7 +145,7 @@ export const create = mutation({
             workflowUrl: "", // Optional
             credentials: args.credentials.map(c => ({
                 ...c,
-                status: c.status as "active" | "needs_refresh" | "failed" // casting
+                status: c.status as "active" | "needs_refresh" | "failed" | "archived" // casting
             })),
             status: "deploying", // Start as deploying, action will update to deployed/failed
             health: {
