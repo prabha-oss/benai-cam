@@ -226,6 +226,11 @@ export class DeploymentEngine {
         // Set workflow to inactive initially (we'll activate after creation)
         workflow.active = false;
 
+        // Remove ID to force n8n to generate a new one
+        if (workflow.id) {
+            delete workflow.id;
+        }
+
         // Replace credential references in nodes
         if (workflow.nodes && Array.isArray(workflow.nodes)) {
             workflow.nodes = workflow.nodes.map((node: any) => {
