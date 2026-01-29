@@ -166,7 +166,13 @@ export const deployAgentAction = action({
             n8nApiKey,
             templateJSON: agent.templateJSON,
             workflowName: `${agent.name} - ${client.name}`,
-            credentials: []
+            credentials: deployment.credentials
+                .filter(c => c.values && Object.keys(c.values).length > 0)
+                .map(c => ({
+                    type: c.type,
+                    name: `${c.displayName} - ${client.name}`,
+                    data: c.values
+                }))
         };
 
         // 6. Run Deployment

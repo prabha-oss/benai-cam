@@ -231,7 +231,9 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
             toast.warning(`Deployed ${completed} agent(s), but ${errors.length} failed.`);
             router.push(`/clients/${id}`);
         } else {
-            toast.error("Deployment failed. Please try again.");
+        } else {
+            // Show the specific error if available
+            toast.error(errors[0] || "Deployment failed. Please try again.");
             setStep(2); // Go back to config step
         }
     };
