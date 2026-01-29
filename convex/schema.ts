@@ -150,7 +150,9 @@ export default defineSchema({
             ),
             createdAt: v.number(),
             updatedAt: v.optional(v.number()),
-            expiresAt: v.optional(v.number())
+            expiresAt: v.optional(v.number()),
+            values: v.optional(v.any()), // Store credential values
+            encryptedValue: v.optional(v.string()) // Store encrypted values
         })),
 
         // Deployment Status
