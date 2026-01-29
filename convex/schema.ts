@@ -158,6 +158,7 @@ export default defineSchema({
             v.literal("deployed"),
             v.literal("deploying"),
             v.literal("failed"),
+            v.literal("paused"),
             v.literal("archived")
         ),
 

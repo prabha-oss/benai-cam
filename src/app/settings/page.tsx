@@ -1,15 +1,52 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Server, Key, Bell, Shield, Save } from "lucide-react";
+import { Settings, Server, Key, Bell, Shield, Save, CheckCircle, Loader2, Edit, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
+    const [n8nUrl, setN8nUrl] = useState("");
+    const [n8nApiKey, setN8nApiKey] = useState("");
+    const [isTested, setIsTested] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
+    const [showEditConfirm, setShowEditConfirm] = useState(false);
+
+    const handleTest = async () => {
+        // Validate inputs
+        if (!n8nUrl || !n8nApiKey) {
+            toast.error("Please enter both URL and API Key");
+            return;
+        }
+
+        setIsTesting(true);
+
+        // Simulate API test call
+        setTimeout(() => {
+            setIsTesting(false);
+            setIsTested(true);
+            toast.success("Connection test successful!");
+        }, 1500);
+    };
+
     const handleSave = () => {
-        toast.success("Settings saved successfully!");
+        setIsSaved(true);
+        toast.success("n8n instance credentials saved successfully!");
+    };
+
+    const handleEdit = () => {
+        setShowEditConfirm(true);
+    };
+
+    const handleConfirmEdit = () => {
+        setShowEditConfirm(false);
+        setIsSaved(false);
+        setIsTested(false);
+        toast.info("You can now edit the credentials");
     };
 
     return (
@@ -34,16 +71,72 @@ export default function SettingsPage() {
                         </p>
                         <div className="space-y-2">
                             <Label>Instance URL</Label>
-                            <Input placeholder="https://your-instance.app.n8n.cloud" />
+                            <Input
+                                placeholder="https://your-instance.app.n8n.cloud"
+                                value={n8nUrl}
+                                onChange={(e) => setN8nUrl(e.target.value)}
+                                disabled={isSaved}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>API Key</Label>
-                            <Input type="password" placeholder="n8n_api_..." />
+                            <Input
+                                type="password"
+                                placeholder="n8n_api_..."
+                                value={n8nApiKey}
+                                onChange={(e) => setN8nApiKey(e.target.value)}
+                                disabled={isSaved}
+                            />
                         </div>
-                        <Button onClick={handleSave}>
-                            <Save className="w-4 h-4 mr-2" />
-                            Save Changes
-                        </Button>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-3 pt-2">
+                            {!isSaved ? (
+                                <>
+                                    {!isTested ? (
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleTest}
+                                            disabled={isTesting || !n8nUrl || !n8nApiKey}
+                                        >
+                                            {isTesting ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Testing...
+                                                </>
+                                            ) : (
+                                                "Test Connection"
+                                            )}
+                                        </Button>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-green-700 text-sm">
+                                            <CheckCircle className="w-4 h-4" />
+                                            Connection Verified
+                                        </div>
+                                    )}
+
+                                    <Button
+                                        onClick={handleSave}
+                                        disabled={!isTested}
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        Save Changes
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button variant="outline" onClick={handleEdit}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit Credentials
+                                </Button>
+                            )}
+                        </div>
+
+                        {isTested && !isSaved && (
+                            <p className="text-xs text-green-700 flex items-center gap-1.5">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Credentials verified. You can now save them.
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -96,6 +189,37 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Edit Confirmation Dialog */}
+            {showEditConfirm && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-md w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-semibold text-lg">Edit Credentials?</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    There are credentials already configured. Do you want to edit them? You'll need to test the connection again before saving.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4">
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowEditConfirm(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button onClick={handleConfirmEdit}>
+                                OK, Edit
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

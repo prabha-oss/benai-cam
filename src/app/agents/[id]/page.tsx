@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Play, Settings, Trash2, Edit, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Settings, Trash2, Edit, X, Loader2, UserPlus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     const agentId = id as Id<"agents">;
 
     const agent = useQuery(api.agents.get, { id: agentId });
+    const clients = useQuery(api.clients.list);
     const updateAgent = useMutation(api.agents.update);
     const deleteAgent = useMutation(api.agents.remove);
 
@@ -26,6 +27,8 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     const [showSettingsMenu, setShowSettingsMenu] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showClientSelector, setShowClientSelector] = useState(false);
+    const [clientSearchQuery, setClientSearchQuery] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -205,6 +208,98 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
             )}
 
+            {/* Client Selector Modal */}
+            {showClientSelector && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-2xl mx-4 bg-white rounded-2xl shadow-xl max-h-[80vh] flex flex-col">
+                        <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+                            <CardTitle className="flex items-center gap-2">
+                                <Play className="w-5 h-5" />
+                                Deploy Agent to Client
+                            </CardTitle>
+                            <Button variant="ghost" size="icon" onClick={() => setShowClientSelector(false)}>
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </CardHeader>
+                        <CardContent className="pt-6 flex-1 overflow-hidden flex flex-col">
+                            {/* Search bar */}
+                            <div className="relative mb-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search clients..."
+                                    className="pl-10"
+                                    value={clientSearchQuery}
+                                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Client list */}
+                            <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+                                {!clients ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                    </div>
+                                ) : (() => {
+                                    const filteredClients = clients
+                                        .filter(c => c.status === "active")
+                                        .filter(c =>
+                                            c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                                            c.email.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                                            c.company.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                                        );
+
+                                    return filteredClients.length === 0 ? (
+                                        <div className="text-center py-8 text-muted-foreground">
+                                            {clientSearchQuery ? (
+                                                <>
+                                                    <p>No clients match your search.</p>
+                                                    <p className="text-sm mt-2">Try a different search term.</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p>No active clients found.</p>
+                                                    <p className="text-sm mt-2">Create a new client to get started.</p>
+                                                </>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        filteredClients.map((client) => (
+                                            <button
+                                                key={client._id}
+                                                onClick={() => router.push(`/clients/${client._id}/deploy?agentId=${agentId}`)}
+                                                className="w-full p-4 text-left border rounded-xl hover:bg-gray-50 hover:border-primary/50 transition-all group"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-medium group-hover:text-primary">{client.name}</h4>
+                                                        <p className="text-sm text-muted-foreground">{client.email}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">{client.company}</p>
+                                                    </div>
+                                                    <ArrowLeft className="w-5 h-5 rotate-180 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-transform" />
+                                                </div>
+                                            </button>
+                                        ))
+                                    );
+                                })()}
+                            </div>
+
+                            {/* Create new client button */}
+                            <div className="border-t pt-4">
+                                <Button
+                                    variant="outline"
+                                    className="w-full  rounded-xl"
+                                    onClick={() => router.push(`/clients/new?agentId=${agentId}`)}
+                                >
+                                    <UserPlus className="w-4 h-4 mr-2" />
+                                    Create New Client
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+
             {/* Header */}
             <div className="flex items-center gap-4 mb-8">
                 <Button
@@ -266,7 +361,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
 
                     <Button
                         className="rounded-xl h-11 px-5 bg-primary hover:bg-primary/90"
-                        onClick={() => router.push(`/clients/new?agentId=${agentId}`)}
+                        onClick={() => setShowClientSelector(true)}
                     >
                         <Play className="w-4 h-4 mr-2" />
                         Deploy to Client

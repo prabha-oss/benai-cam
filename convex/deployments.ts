@@ -69,6 +69,24 @@ export const getByClient = query({
     },
 });
 
+// Get a single deployment by ID
+export const get = query({
+    args: { id: v.id("deployments") },
+    handler: async (ctx, args) => {
+        const deployment = await ctx.db.get(args.id);
+        if (!deployment) return null;
+
+        const agent = await ctx.db.get(deployment.agentId);
+        const client = await ctx.db.get(deployment.clientId);
+
+        return {
+            ...deployment,
+            agentName: agent?.name || "Unknown Agent",
+            clientName: client?.name || "Unknown Client",
+        };
+    },
+});
+
 // Create a new deployment record
 export const create = mutation({
     args: {
@@ -84,15 +102,18 @@ export const create = mutation({
             type: v.string(),
             status: v.string(), // "active" | "needs_refresh"
             createdAt: v.number(),
+            values: v.optional(v.any()), // Optional credential values from deployment
+            encryptedValue: v.optional(v.string()), // Optional encrypted credential value
+            updatedAt: v.optional(v.number()),
+            expiresAt: v.optional(v.number()),
         })),
         // Optional n8n credentials for client_instance deployments
         n8nUrl: v.optional(v.string()),
         n8nApiKey: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Check if deployment already exists for this pair?
-        // For MVP allow multiple, but PRD says "One deployment per client-agent pair" (Business Rule 1)
-        // Let's enforce it.
+        // Check if deployment already exists for this client-agent pair
+        // If it exists, archive it and create a new one (re-deployment)
         const existing = await ctx.db
             .query("deployments")
             .withIndex("by_client_agent", q => q.eq("clientId", args.clientId).eq("agentId", args.agentId))
@@ -100,7 +121,11 @@ export const create = mutation({
             .first();
 
         if (existing) {
-            throw new Error("This agent is already deployed to this client.");
+            // Archive the existing deployment to allow re-deployment
+            await ctx.db.patch(existing._id, {
+                status: "archived",
+                archivedAt: Date.now(),
+            });
         }
 
         // Deployment Type validation
@@ -197,5 +222,82 @@ export const getInternal = internalQuery({
     args: { id: v.id("deployments") },
     handler: async (ctx, args) => {
         return await ctx.db.get(args.id);
+    },
+});
+
+
+// Toggle deployment active status (pause/resume for a specific client)
+export const toggleActive = mutation({
+    args: { id: v.id("deployments") },
+    handler: async (ctx, args) => {
+        const deployment = await ctx.db.get(args.id);
+        if (!deployment) {
+            throw new Error("Deployment not found");
+        }
+
+        const newStatus = deployment.status === "deployed" ? "paused" : "deployed";
+
+        await ctx.db.patch(args.id, {
+            status: newStatus,
+        });
+
+        // Get agent and client names for activity log
+        const agent = await ctx.db.get(deployment.agentId);
+        const client = await ctx.db.get(deployment.clientId);
+
+        // Log activity
+        await ctx.db.insert("activityLog", {
+            entityType: "deployment",
+            entityId: args.id,
+            action: newStatus === "deployed" ? "activated" : "paused",
+            description: `${newStatus === "deployed" ? "Activated" : "Paused"} deployment of "${agent?.name || "Unknown"}" for "${client?.name || "Unknown"}"`,
+            timestamp: Date.now(),
+        });
+
+        return newStatus;
+    },
+});
+
+// Update deployment credentials
+export const updateCredentials = mutation({
+    args: {
+        id: v.id("deployments"),
+        credentials: v.array(v.object({
+            key: v.string(),
+            n8nCredentialId: v.string(),
+            displayName: v.string(),
+            type: v.string(),
+            status: v.union(v.literal("active"), v.literal("needs_refresh"), v.literal("failed"), v.literal("archived")),
+            createdAt: v.number(),
+            updatedAt: v.optional(v.number()),
+            expiresAt: v.optional(v.number()),
+        })),
+    },
+    handler: async (ctx, args) => {
+        const deployment = await ctx.db.get(args.id);
+        if (!deployment) {
+            throw new Error("Deployment not found");
+        }
+
+        await ctx.db.patch(args.id, {
+            credentials: args.credentials.map(cred => ({
+                ...cred,
+                updatedAt: Date.now(),
+            })),
+            updatedAt: Date.now(),
+        });
+
+        // Get agent and client names for activity log
+        const agent = await ctx.db.get(deployment.agentId);
+        const client = await ctx.db.get(deployment.clientId);
+
+        // Log activity
+        await ctx.db.insert("activityLog", {
+            entityType: "deployment",
+            entityId: args.id,
+            action: "credentials_updated",
+            description: `Updated credentials for deployment of "${agent?.name || "Unknown"}" for "${client?.name || "Unknown"}"`,
+            timestamp: Date.now(),
+        });
     },
 });

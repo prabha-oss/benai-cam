@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Upload, AlertCircle, Loader2, Search, Workflow, RefreshCw, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Upload, AlertCircle, Loader2, Search, Workflow, RefreshCw, Plus, Pencil, X } from "lucide-react";
 import { extractCredentials, CredentialSchema } from "@/lib/agents/credentialExtractor";
 
 interface N8nWorkflow {
@@ -45,6 +45,12 @@ export default function NewAgentPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
     const [isLoadingWorkflowJson, setIsLoadingWorkflowJson] = useState(false);
+
+    // Manual credential form state
+    const [showAddCredentialForm, setShowAddCredentialForm] = useState(false);
+    const [newCredential, setNewCredential] = useState({ name: "", type: "customCredential" });
+    const [editingCredentialIndex, setEditingCredentialIndex] = useState<number | null>(null);
+    const [editingCredentialName, setEditingCredentialName] = useState("");
 
     // Fetch workflows when component mounts or when switching to n8n mode
     useEffect(() => {
@@ -102,6 +108,56 @@ export default function NewAgentPage() {
     const filteredWorkflows = workflows.filter(wf =>
         wf.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const handleAddCredential = () => {
+        if (!newCredential.name.trim()) {
+            toast.error("Credential name is required");
+            return;
+        }
+
+        setParsedSchema((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                simple: [
+                    ...prev.simple,
+                    {
+                        type: newCredential.type,
+                        displayName: newCredential.name,
+                        instances: 1,
+                        fields: [
+                            { name: 'value', label: 'Credential Value', type: 'password' as const, required: true }
+                        ]
+                    }
+                ]
+            };
+        });
+
+        toast.success(`Added "${newCredential.name}" credential`);
+        setNewCredential({ name: "", type: "customCredential" });
+        setShowAddCredentialForm(false);
+    };
+
+    const handleUpdateCredentialName = (index: number) => {
+        if (!editingCredentialName.trim()) {
+            toast.error("Credential name cannot be empty");
+            return;
+        }
+
+        setParsedSchema((prev) => {
+            if (!prev) return prev;
+            const updatedSimple = [...prev.simple];
+            updatedSimple[index] = {
+                ...updatedSimple[index],
+                displayName: editingCredentialName
+            };
+            return { ...prev, simple: updatedSimple };
+        });
+
+        toast.success("Credential name updated");
+        setEditingCredentialIndex(null);
+        setEditingCredentialName("");
+    };
 
     const handleNext = async () => {
         if (step === 1) {
@@ -344,15 +400,61 @@ export default function NewAgentPage() {
                                 {parsedSchema.simple.length > 0 && (
                                     <div className="space-y-4 mb-6">
                                         <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Simple Match (One-to-All)</h4>
-                                        {parsedSchema.simple.map((cred) => (
-                                            <div key={cred.type} className="flex items-start gap-3 p-3 border rounded-md bg-gray-50">
+                                        {parsedSchema.simple.map((cred, index) => (
+                                            <div key={`${cred.type}-${index}`} className="flex items-start gap-3 p-3 border rounded-md bg-gray-50">
                                                 <Checkbox checked disabled />
                                                 <div className="flex-1">
-                                                    <div className="flex justify-between">
-                                                        <span className="font-medium text-sm">{cred.displayName}</span>
-                                                        <span className="text-xs bg-white border px-2 py-0.5 rounded-full text-gray-600">
-                                                            {cred.instances} instances
-                                                        </span>
+                                                    <div className="flex justify-between items-center">
+                                                        {editingCredentialIndex === index ? (
+                                                            <div className="flex items-center gap-2 flex-1">
+                                                                <Input
+                                                                    value={editingCredentialName}
+                                                                    onChange={(e) => setEditingCredentialName(e.target.value)}
+                                                                    className="h-8 text-sm"
+                                                                    placeholder="Credential name"
+                                                                    autoFocus
+                                                                />
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => handleUpdateCredentialName(index)}
+                                                                    className="h-8 w-8 p-0"
+                                                                >
+                                                                    <Check className="w-4 h-4 text-green-600" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() => {
+                                                                        setEditingCredentialIndex(null);
+                                                                        setEditingCredentialName("");
+                                                                    }}
+                                                                    className="h-8 w-8 p-0"
+                                                                >
+                                                                    <X className="w-4 h-4 text-gray-500" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-medium text-sm">{cred.displayName}</span>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() => {
+                                                                            setEditingCredentialIndex(index);
+                                                                            setEditingCredentialName(cred.displayName);
+                                                                        }}
+                                                                        className="h-6 w-6 p-0 hover:bg-gray-200"
+                                                                    >
+                                                                        <Pencil className="w-3 h-3 text-gray-500" />
+                                                                    </Button>
+                                                                </div>
+                                                                <span className="text-xs bg-white border px-2 py-0.5 rounded-full text-gray-600">
+                                                                    {cred.instances} instances
+                                                                </span>
+                                                            </>
+                                                        )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1">Type: {cred.type}</p>
                                                 </div>
@@ -396,39 +498,58 @@ export default function NewAgentPage() {
                                     <p className="text-sm text-muted-foreground mb-4">
                                         Add credentials that weren't auto-detected from the workflow.
                                     </p>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                            const credName = prompt("Credential Name (e.g., 'Custom API Key'):");
-                                            if (!credName) return;
-                                            const credType = prompt("Credential Type (e.g., 'apiKey', 'httpHeaderAuth'):", "customCredential");
-                                            if (!credType) return;
 
-                                            // Add to parsedSchema
-                                            setParsedSchema((prev) => {
-                                                if (!prev) return prev;
-                                                return {
-                                                    ...prev,
-                                                    simple: [
-                                                        ...prev.simple,
-                                                        {
-                                                            type: credType,
-                                                            displayName: credName,
-                                                            instances: 1,
-                                                            fields: [
-                                                                { name: 'value', label: 'Credential Value', type: 'password' as const, required: true }
-                                                            ]
-                                                        }
-                                                    ]
-                                                };
-                                            });
-                                            toast.success(`Added "${credName}" credential`);
-                                        }}
-                                    >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Manual Credential
-                                    </Button>
+                                    {showAddCredentialForm ? (
+                                        <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="cred-name">Credential Name *</Label>
+                                                <Input
+                                                    id="cred-name"
+                                                    placeholder="e.g., 'Custom API Key'"
+                                                    value={newCredential.name}
+                                                    onChange={(e) => setNewCredential({ ...newCredential, name: e.target.value })}
+                                                    autoFocus
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="cred-type">Credential Type</Label>
+                                                <Input
+                                                    id="cred-type"
+                                                    placeholder="e.g., 'apiKey', 'httpHeaderAuth'"
+                                                    value={newCredential.type}
+                                                    onChange={(e) => setNewCredential({ ...newCredential, type: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setShowAddCredentialForm(false);
+                                                        setNewCredential({ name: "", type: "customCredential" });
+                                                    }}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    onClick={handleAddCredential}
+                                                >
+                                                    <Plus className="w-4 h-4 mr-2" />
+                                                    Add Credential
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setShowAddCredentialForm(true)}
+                                        >
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Add Manual Credential
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>

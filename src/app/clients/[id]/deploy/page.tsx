@@ -24,11 +24,14 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
     const createDeployment = useMutation(api.deployments.create);
     const deployAgentAction = useAction(api.actions.deployAgentAction);
 
-    // Step state: 1 = select agents, 2 = deployment target, 3 = deploying
+    // Step state: 1 = select agents, 2 = deployment target, 3 = credentials, 4 = deploying
     const [step, setStep] = useState(1);
     const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
     const [isDeploying, setIsDeploying] = useState(false);
     const [progress, setProgress] = useState("");
+
+    // Credential values state
+    const [credentialValues, setCredentialValues] = useState<Record<string, any>>({});
 
     // Deployment target config
     const [deploymentType, setDeploymentType] = useState<"your_instance" | "client_instance">("your_instance");
@@ -78,12 +81,61 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                     return;
                 }
             }
+            setStep(3); // Go to credential collection
+        } else if (step === 3) {
+            // Validate credentials before deploying
+            const allCredentialsFilled = validateCredentials();
+            if (!allCredentialsFilled) {
+                toast.error("Please fill in all required credentials");
+                return;
+            }
             handleDeploy();
         }
     };
 
+    const validateCredentials = () => {
+        // Check all selected agents' credentials are filled
+        for (const agentId of selectedAgentIds) {
+            const agent = availableAgents.find(a => a._id === agentId);
+            if (!agent) continue;
+
+            // Check simple credentials
+            for (const cred of agent.credentialSchema.simple) {
+                for (let i = 0; i < cred.instances; i++) {
+                    const key = `${agentId}_${cred.type}_${i}`;
+                    const values = credentialValues[key];
+                    if (!values) return false;
+
+                    // Check required fields
+                    for (const field of cred.fields) {
+                        if (field.required && !values[field.name]) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            // Check special credentials
+            for (const cred of agent.credentialSchema.special) {
+                for (let i = 0; i < cred.instances; i++) {
+                    const key = `${agentId}_${cred.type}_${i}`;
+                    const values = credentialValues[key];
+                    if (!values) return false;
+
+                    // Check required fields
+                    for (const field of cred.fields) {
+                        if (field.required && !values[field.name]) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    };
+
     const handleDeploy = async () => {
-        setStep(3);
+        setStep(4); // Updated to step 4 (deploying)
         setIsDeploying(true);
         const total = selectedAgentIds.length;
         let completed = 0;
@@ -96,6 +148,44 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
             try {
                 setProgress(`Deploying ${agentName} (${completed + 1}/${total})...`);
 
+                // Format credentials for this agent
+                const formattedCredentials = [];
+                if (agent) {
+                    // Process simple credentials
+                    for (const cred of agent.credentialSchema.simple) {
+                        for (let i = 0; i < cred.instances; i++) {
+                            const key = `${agentId}_${cred.type}_${i}`;
+                            const values = credentialValues[key] || {};
+                            formattedCredentials.push({
+                                key: cred.type,
+                                n8nCredentialId: "", // Will be set by deployment action
+                                displayName: cred.displayName,
+                                type: cred.type,
+                                values: values,
+                                status: "active" as const,
+                                createdAt: Date.now(),
+                            });
+                        }
+                    }
+
+                    // Process special credentials
+                    for (const cred of agent.credentialSchema.special) {
+                        for (let i = 0; i < cred.instances; i++) {
+                            const key = `${agentId}_${cred.type}_${i}`;
+                            const values = credentialValues[key] || {};
+                            formattedCredentials.push({
+                                key: cred.keyword,
+                                n8nCredentialId: "", // Will be set by deployment action
+                                displayName: cred.displayName,
+                                type: cred.type,
+                                values: values,
+                                status: "active" as const,
+                                createdAt: Date.now(),
+                            });
+                        }
+                    }
+                }
+
                 // Create deployment record with the selected deployment type
                 const deploymentId = await createDeployment({
                     clientId,
@@ -103,7 +193,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                     deploymentType: deploymentType,
                     workflowId: "",
                     workflowName: `${agentName} - ${client?.name}`,
-                    credentials: [],
+                    credentials: formattedCredentials,
                     // Pass n8n config for client_instance deployments
                     n8nUrl: deploymentType === "client_instance" ? n8nUrl : undefined,
                     n8nApiKey: deploymentType === "client_instance" ? n8nApiKey : undefined,
@@ -158,7 +248,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Deploy Agent to {client.name}</h1>
                     <p className="text-muted-foreground">
-                        Step {step} of 3: {step === 1 ? "Select Agents" : step === 2 ? "Deployment Target" : "Deploying"}
+                        Step {step} of 4: {step === 1 ? "Select Agents" : step === 2 ? "Deployment Target" : step === 3 ? "Collect Credentials" : "Deploying"}
                     </p>
                 </div>
             </div>
@@ -192,8 +282,8 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                                     <div
                                         key={agent._id}
                                         className={`flex items-start gap-4 p-4 rounded-lg border cursor-pointer transition-colors ${selectedAgentIds.includes(agent._id)
-                                                ? "border-primary bg-primary/5"
-                                                : "hover:bg-gray-50"
+                                            ? "border-primary bg-primary/5"
+                                            : "hover:bg-gray-50"
                                             }`}
                                         onClick={() => toggleAgent(agent._id)}
                                     >
@@ -336,8 +426,96 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                 </Card>
             )}
 
-            {/* Step 3: Deployment Progress */}
+            {/* Step 3: Collect Credentials */}
             {step === 3 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Lock className="w-5 h-5 text-blue-600" />
+                            Configure Credentials
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <p className="text-sm text-muted-foreground">
+                            Enter the credential values for the selected agents. These will be securely stored and used when deploying the workflows.
+                        </p>
+
+                        {selectedAgentIds.map(agentId => {
+                            const agent = availableAgents.find(a => a._id === agentId);
+                            if (!agent) return null;
+
+                            const allCredentials = [
+                                ...agent.credentialSchema.simple.map(c => ({ ...c, isSpecial: false })),
+                                ...agent.credentialSchema.special.map(c => ({ ...c, isSpecial: true }))
+                            ];
+
+                            if (allCredentials.length === 0) return null;
+
+                            return (
+                                <div key={agentId} className="border rounded-lg p-4 space-y-4">
+                                    <h4 className="font-medium text-sm flex items-center gap-2">
+                                        <Zap className="w-4 h-4 text-blue-600" />
+                                        {agent.name}
+                                    </h4>
+
+                                    {allCredentials.map((cred, credIndex) => {
+                                        const instances = [];
+                                        for (let i = 0; i < cred.instances; i++) {
+                                            instances.push(i);
+                                        }
+
+                                        return instances.map(instanceIndex => {
+                                            const key = `${agentId}_${cred.type}_${instanceIndex}`;
+                                            const values = credentialValues[key] || {};
+
+                                            return (
+                                                <div key={key} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-gray-700">
+                                                            {cred.displayName}
+                                                            {instances.length > 1 && ` #${instanceIndex + 1}`}
+                                                        </span>
+                                                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                                            {cred.type}
+                                                        </span>
+                                                    </div>
+
+                                                    {cred.fields.map(field => (
+                                                        <div key={field.name} className="space-y-1.5">
+                                                            <Label className="text-xs">
+                                                                {field.label}
+                                                                {field.required && <span className="text-red-500 ml-1">*</span>}
+                                                            </Label>
+                                                            <Input
+                                                                type={field.type === "password" ? "password" : "text"}
+                                                                value={values[field.name] || field.default || ""}
+                                                                onChange={(e) => {
+                                                                    setCredentialValues(prev => ({
+                                                                        ...prev,
+                                                                        [key]: {
+                                                                            ...prev[key],
+                                                                            [field.name]: e.target.value
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                placeholder={`Enter ${field.label.toLowerCase()}`}
+                                                                className="h-9 text-sm"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            );
+                                        });
+                                    })}
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Step 4: Deployment Progress */}
+            {step === 4 && (
                 <Card className="border-blue-200 bg-blue-50">
                     <CardContent className="py-8">
                         <div className="flex flex-col items-center gap-4">
@@ -352,7 +530,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Actions */}
-            {step !== 3 && (
+            {step !== 4 && (
                 <div className="flex justify-between items-center pt-4">
                     <Button variant="ghost" onClick={() => router.back()} disabled={isDeploying}>
                         Cancel
@@ -362,7 +540,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                         disabled={isDeploying || (step === 1 && selectedAgentIds.length === 0)}
                         className="min-w-[140px]"
                     >
-                        {step === 1 ? (
+                        {step === 1 || step === 2 ? (
                             <>
                                 Next
                                 <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
