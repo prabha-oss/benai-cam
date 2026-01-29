@@ -146,9 +146,16 @@ export default function DeploymentManagePage({ params }: { params: Promise<{ id:
                                         </div>
                                     )}
                                     {deployment.status === "failed" && (
-                                        <div className="flex items-center gap-1.5 text-sm text-red-600">
-                                            <AlertTriangle className="w-4 h-4" />
-                                            Failed
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5 text-sm text-red-600">
+                                                <AlertTriangle className="w-4 h-4" />
+                                                Failed
+                                            </div>
+                                            {deployment.deploymentError && (
+                                                <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded mt-1">
+                                                    {deployment.deploymentError}
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </div>

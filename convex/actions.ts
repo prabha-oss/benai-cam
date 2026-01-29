@@ -159,6 +159,21 @@ export const deployAgentAction = action({
         }
 
         // 5. Prepare Deployment Config
+        console.log("Preparing deployment config...");
+        console.log("n8nUrl:", n8nUrl);
+        console.log("credentials count:", deployment.credentials?.length || 0);
+        console.log("templateJSON exists:", !!agent.templateJSON);
+
+        const filteredCredentials = (deployment.credentials || [])
+            .filter(c => c.values && Object.keys(c.values).length > 0)
+            .map(c => ({
+                type: c.type,
+                name: `${c.displayName} - ${client.name}`,
+                data: c.values.credential || c.values
+            }));
+
+        console.log("Filtered credentials:", JSON.stringify(filteredCredentials, null, 2));
+
         const config: DeploymentConfig = {
             clientId: client._id,
             agentId: agent._id,
@@ -166,13 +181,7 @@ export const deployAgentAction = action({
             n8nApiKey,
             templateJSON: agent.templateJSON,
             workflowName: `${agent.name} - ${client.name}`,
-            credentials: deployment.credentials
-                .filter(c => c.values && Object.keys(c.values).length > 0)
-                .map(c => ({
-                    type: c.type,
-                    name: `${c.displayName} - ${client.name}`,
-                    data: c.values.credential || c.values
-                }))
+            credentials: filteredCredentials
         };
 
         // 6. Run Deployment

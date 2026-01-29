@@ -399,9 +399,16 @@ export default function ClientDashboardPage({ params }: { params: Promise<{ id: 
                                                     Deploying
                                                 </div>
                                             ) : d.status === "failed" ? (
-                                                <div className="flex items-center gap-1.5 text-sm text-red-600 bg-red-50 px-3 py-1 rounded-full">
-                                                    <AlertTriangle className="w-4 h-4" />
-                                                    Failed
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <div className="flex items-center gap-1.5 text-sm text-red-600 bg-red-50 px-3 py-1 rounded-full">
+                                                        <AlertTriangle className="w-4 h-4" />
+                                                        Failed
+                                                    </div>
+                                                    {d.deploymentError && (
+                                                        <span className="text-xs text-red-500 max-w-[200px] truncate" title={d.deploymentError}>
+                                                            {d.deploymentError}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ) : d.status === "paused" ? (
                                                 <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
