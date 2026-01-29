@@ -101,28 +101,30 @@ export const create = mutation({
         n8nApiKey: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Check if deployment already exists for this client-agent pair
-        // If it exists, archive it and create a new one (re-deployment)
-        const existing = await ctx.db
-            .query("deployments")
-            .withIndex("by_client_agent", q => q.eq("clientId", args.clientId).eq("agentId", args.agentId))
-            .filter(q => q.neq(q.field("status"), "archived"))
-            .first();
-
-        if (existing) {
-            // Archive the existing deployment to allow re-deployment
-            await ctx.db.patch(existing._id, {
-                status: "archived",
-                archivedAt: Date.now(),
-            });
-        }
-
-        // Deployment Type validation
-        if (args.deploymentType !== 'client_instance' && args.deploymentType !== 'your_instance') {
-            throw new Error("Invalid deployment type");
-        }
+        console.log("deployments:create args:", args);
 
         try {
+            // Check if deployment already exists for this client-agent pair
+            // If it exists, archive it and create a new one (re-deployment)
+            const existing = await ctx.db
+                .query("deployments")
+                .withIndex("by_client_agent", q => q.eq("clientId", args.clientId).eq("agentId", args.agentId))
+                .filter(q => q.neq(q.field("status"), "archived"))
+                .first();
+
+            if (existing) {
+                // Archive the existing deployment to allow re-deployment
+                await ctx.db.patch(existing._id, {
+                    status: "archived",
+                    archivedAt: Date.now(),
+                });
+            }
+
+            // Deployment Type validation
+            if (args.deploymentType !== 'client_instance' && args.deploymentType !== 'your_instance') {
+                throw new Error("Invalid deployment type");
+            }
+
             const deploymentId = await ctx.db.insert("deployments", {
                 clientId: args.clientId,
                 agentId: args.agentId,
@@ -158,10 +160,10 @@ export const create = mutation({
                 timestamp: Date.now(),
             });
 
-            return deploymentId;
+            return { deploymentId, error: null };
         } catch (error: any) {
             console.error("Deployment creation failed:", error);
-            throw new ConvexError(`Failed to create deployment record: ${error.message}`);
+            return { deploymentId: null, error: `Failed to create deployment: ${error.message}` };
         }
     }
 });

@@ -201,7 +201,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                 }
 
                 // Create deployment record with the selected deployment type
-                const deploymentId = await createDeployment({
+                const response = await createDeployment({
                     clientId,
                     agentId: agentId as Id<"agents">,
                     deploymentType: deploymentType,
@@ -211,7 +211,13 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                     // Pass n8n config for client_instance deployments
                     n8nUrl: deploymentType === "client_instance" ? n8nUrl : undefined,
                     n8nApiKey: deploymentType === "client_instance" ? n8nApiKey : undefined,
-                });
+                }) as { deploymentId: Id<"deployments"> | null, error: string | null };
+
+                if (response.error || !response.deploymentId) {
+                    throw new Error(response.error || "Failed to create deployment record");
+                }
+
+                const deploymentId = response.deploymentId;
 
                 // Trigger deployment action
                 await deployAgentAction({ deploymentId });
