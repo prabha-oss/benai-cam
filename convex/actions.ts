@@ -267,9 +267,17 @@ export const deployAgentAction = action({
             // but risky if we expect them.
         }
 
+        // Type for deployment credentials
+        type DeploymentCredential = {
+            type: string;
+            displayName: string;
+            values?: Record<string, any>;
+            encryptedValue?: string;
+        };
+
         const filteredCredentials = await Promise.all((deployment.credentials || [])
-            .filter(c => (c.values && Object.keys(c.values).length > 0) || c.encryptedValue)
-            .map(async c => {
+            .filter((c: DeploymentCredential) => (c.values && Object.keys(c.values).length > 0) || c.encryptedValue)
+            .map(async (c: DeploymentCredential) => {
                 let data = c.values?.credential || c.values;
 
                 if (c.encryptedValue) {
@@ -351,10 +359,19 @@ export const deployAgentAction = action({
     }
 });
 
+// Result type for health check cron
+interface HealthCheckCronResult {
+    total: number;
+    checked: number;
+    healthy: number;
+    unhealthy: number;
+    errors: string[];
+}
+
 // Internal action for scheduled health checks (called by cron)
 export const checkAllDeploymentsHealth = internalAction({
     args: {},
-    handler: async (ctx) => {
+    handler: async (ctx): Promise<HealthCheckCronResult> => {
         console.log("[Health Cron] Starting scheduled health checks...");
 
         // 1. Get all active deployments
@@ -362,12 +379,12 @@ export const checkAllDeploymentsHealth = internalAction({
 
         console.log(`[Health Cron] Found ${deploymentIds.length} active deployments to check`);
 
-        const results = {
+        const results: HealthCheckCronResult = {
             total: deploymentIds.length,
             checked: 0,
             healthy: 0,
             unhealthy: 0,
-            errors: [] as string[]
+            errors: []
         };
 
         // 2. Check each deployment (with error handling so one failure doesn't stop others)

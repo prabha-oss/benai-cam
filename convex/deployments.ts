@@ -215,7 +215,6 @@ export const updateHealth = internalMutation({
             }
         });
     }
-}
 });
 
 // Update deployment progress (internal use by actions)
