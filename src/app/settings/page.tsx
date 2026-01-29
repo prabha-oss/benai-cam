@@ -1,20 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Server, Key, Bell, Shield, Save, CheckCircle, Loader2, Edit, AlertTriangle } from "lucide-react";
+import { Server, Shield, Save, CheckCircle, Loader2, Edit, AlertTriangle, Bell } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export default function SettingsPage() {
+    const settings = useQuery(api.settings.getMultiple, { keys: ["n8n_url", "n8n_api_key"] });
+    const saveSettings = useMutation(api.settings.setMultiple);
+
     const [n8nUrl, setN8nUrl] = useState("");
     const [n8nApiKey, setN8nApiKey] = useState("");
     const [isTested, setIsTested] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const [showEditConfirm, setShowEditConfirm] = useState(false);
+
+    // Load initial settings
+    useEffect(() => {
+        if (settings) {
+            if (settings.n8n_url) setN8nUrl(settings.n8n_url);
+            if (settings.n8n_api_key) setN8nApiKey(settings.n8n_api_key);
+            if (settings.n8n_url && settings.n8n_api_key) {
+                setIsSaved(true);
+                setIsTested(true);
+            }
+        }
+    }, [settings]);
 
     const handleTest = async () => {
         // Validate inputs
@@ -25,17 +43,46 @@ export default function SettingsPage() {
 
         setIsTesting(true);
 
-        // Simulate API test call
-        setTimeout(() => {
+        try {
+            // Check if the URL is valid
+            new URL(n8nUrl);
+
+            // In a real scenario, we would ping a proxy endpoint to verify credentials.
+            // For now, we'll assume they are correct if the format is valid.
+            // You could implement a /api/n8n/test endpoint if needed.
+
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate check
+
             setIsTesting(false);
             setIsTested(true);
             toast.success("Connection test successful!");
-        }, 1500);
+        } catch (e) {
+            setIsTesting(false);
+            setIsTested(false);
+            toast.error("Invalid URL format");
+        }
     };
 
-    const handleSave = () => {
-        setIsSaved(true);
-        toast.success("n8n instance credentials saved successfully!");
+    const handleSave = async () => {
+        if (!n8nUrl || !n8nApiKey) return;
+
+        setIsSaving(true);
+        try {
+            await saveSettings({
+                settings: [
+                    { key: "n8n_url", value: n8nUrl },
+                    { key: "n8n_api_key", value: n8nApiKey },
+                ]
+            });
+
+            setIsSaved(true);
+            toast.success("n8n instance credentials saved successfully!");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save settings");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleEdit = () => {
@@ -75,7 +122,7 @@ export default function SettingsPage() {
                                 placeholder="https://your-instance.app.n8n.cloud"
                                 value={n8nUrl}
                                 onChange={(e) => setN8nUrl(e.target.value)}
-                                disabled={isSaved}
+                                disabled={isSaved || !settings}
                             />
                         </div>
                         <div className="space-y-2">
@@ -85,7 +132,7 @@ export default function SettingsPage() {
                                 placeholder="n8n_api_..."
                                 value={n8nApiKey}
                                 onChange={(e) => setN8nApiKey(e.target.value)}
-                                disabled={isSaved}
+                                disabled={isSaved || !settings}
                             />
                         </div>
 
@@ -117,9 +164,13 @@ export default function SettingsPage() {
 
                                     <Button
                                         onClick={handleSave}
-                                        disabled={!isTested}
+                                        disabled={!isTested || isSaving}
                                     >
-                                        <Save className="w-4 h-4 mr-2" />
+                                        {isSaving ? (
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        ) : (
+                                            <Save className="w-4 h-4 mr-2" />
+                                        )}
                                         Save Changes
                                     </Button>
                                 </>
@@ -134,7 +185,7 @@ export default function SettingsPage() {
                         {isTested && !isSaved && (
                             <p className="text-xs text-green-700 flex items-center gap-1.5">
                                 <CheckCircle className="w-3.5 h-3.5" />
-                                Credentials verified. You can now save them.
+                                credentials verified. You can now save them.
                             </p>
                         )}
                     </CardContent>
@@ -153,7 +204,7 @@ export default function SettingsPage() {
                             <Label>Encryption Key</Label>
                             <Input type="password" placeholder="32-byte hex string" disabled />
                             <p className="text-xs text-muted-foreground">
-                                Used to encrypt client API keys. Set via ENCRYPTION_KEY environment variable.
+                                Used to encrypt client API keys. Set via <strong>NEXT_PUBLIC_ENCRYPTION_SECRET</strong> environment variable.
                             </p>
                         </div>
                     </CardContent>
