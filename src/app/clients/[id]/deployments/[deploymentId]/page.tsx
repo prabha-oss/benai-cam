@@ -139,18 +139,54 @@ export default function DeploymentManagePage({ params }: { params: Promise<{ id:
                                             Paused
                                         </div>
                                     )}
+                                    {deployment.status === "deploying" && (
+                                        <div className="flex items-center gap-1.5 text-sm text-blue-600">
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Deploying...
+                                        </div>
+                                    )}
+                                    {deployment.status === "failed" && (
+                                        <div className="flex items-center gap-1.5 text-sm text-red-600">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            Failed
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <div>
-                                <span className="text-sm text-muted-foreground">Workflow ID:</span>
-                                <p className="font-medium text-xs">{deployment.workflowId || "N/A"}</p>
+                            <div className="col-span-2 sm:col-span-1">
+                                <span className="text-sm text-muted-foreground">Workflow:</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <p className="font-medium text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                                        {deployment.workflowId || "N/A"}
+                                    </p>
+                                    {deployment.workflowUrl && (
+                                        <a
+                                            href={deployment.workflowUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline text-xs flex items-center gap-1"
+                                        >
+                                            Open in n8n
+                                        </a>
+                                    )}
+                                </div>
                             </div>
                             <div>
                                 <span className="text-sm text-muted-foreground">Deployed:</span>
                                 <p className="font-medium text-sm">
-                                    {new Date(deployment.deployedAt).toLocaleDateString()}
+                                    {deployment.deployedAt ? new Date(deployment.deployedAt).toLocaleDateString() + ' ' + new Date(deployment.deployedAt).toLocaleTimeString() : 'Pending'}
                                 </p>
                             </div>
+                            {deployment.n8nInstanceUrl && (
+                                <div className="col-span-2">
+                                    <span className="text-sm text-muted-foreground">n8n Instance:</span>
+                                    <p className="font-medium text-sm text-blue-600 truncate">
+                                        <a href={deployment.n8nInstanceUrl} target="_blank" rel="noopener noreferrer">
+                                            {deployment.n8nInstanceUrl}
+                                        </a>
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
