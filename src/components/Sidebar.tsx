@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, Zap, Settings, LogOut, HelpCircle, LayoutDashboard, Plus } from "lucide-react";
+import { Home, Users, Zap, Settings, LogOut, HelpCircle, LayoutDashboard, Plus, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
     { href: "/agents", label: "Agents", icon: Zap, hasAdd: true },
     { href: "/clients", label: "Clients", icon: Users, hasAdd: true },
     { href: "/deployments", label: "Deployments", icon: LayoutDashboard },
+    { href: "/activity", label: "Activity", icon: Activity },
     { href: "/settings", label: "Settings", icon: Settings },
 ];
 

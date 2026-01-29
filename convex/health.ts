@@ -2,6 +2,19 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 
+// Get IDs of all active deployments for health checks (used by cron)
+export const getActiveDeploymentIds = internalQuery({
+    args: {},
+    handler: async (ctx) => {
+        const deployments = await ctx.db
+            .query("deployments")
+            .withIndex("by_status", (q) => q.eq("status", "deployed"))
+            .collect();
+
+        return deployments.map(d => d._id);
+    },
+});
+
 // Get health history for a deployment
 export const getHistory = query({
     args: { deploymentId: v.id("deployments"), limit: v.optional(v.number()) },

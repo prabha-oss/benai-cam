@@ -166,6 +166,13 @@ export default defineSchema({
 
         deploymentError: v.optional(v.string()),
 
+        deploymentProgress: v.optional(v.object({
+            stage: v.string(), // 'initializing' | 'creating_credentials' | etc
+            progress: v.number(), // 0-100
+            message: v.string(),
+            details: v.optional(v.string())
+        })),
+
         // Health Monitoring
         health: v.object({
             lastChecked: v.number(),

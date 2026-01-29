@@ -215,6 +215,29 @@ export const updateHealth = internalMutation({
             }
         });
     }
+}
+});
+
+// Update deployment progress (internal use by actions)
+export const updateProgress = internalMutation({
+    args: {
+        id: v.id("deployments"),
+        stage: v.string(),
+        progress: v.number(),
+        message: v.string(),
+        details: v.optional(v.string())
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.id, {
+            deploymentProgress: {
+                stage: args.stage,
+                progress: args.progress,
+                message: args.message,
+                details: args.details
+            },
+            updatedAt: Date.now()
+        });
+    }
 });
 
 // Internal query to get deployment for actions

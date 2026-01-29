@@ -140,21 +140,53 @@ export default function DeploymentManagePage({ params }: { params: Promise<{ id:
                                         </div>
                                     )}
                                     {deployment.status === "deploying" && (
-                                        <div className="flex items-center gap-1.5 text-sm text-blue-600">
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Deploying...
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-1.5 text-sm text-blue-600">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Deploying...
+                                            </div>
+                                            {deployment.deploymentProgress && (
+                                                <div className="bg-blue-50 rounded-lg p-3 space-y-2">
+                                                    <p className="text-sm text-blue-700 font-medium">
+                                                        {deployment.deploymentProgress.message || deployment.deploymentProgress.stage}
+                                                    </p>
+                                                    {deployment.deploymentProgress.progress >= 0 && (
+                                                        <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-blue-500 transition-all duration-300"
+                                                                style={{ width: `${deployment.deploymentProgress.progress}%` }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {deployment.deploymentProgress.details && (
+                                                        <p className="text-xs text-blue-600">
+                                                            {deployment.deploymentProgress.details}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     {deployment.status === "failed" && (
-                                        <div className="flex flex-col gap-1">
+                                        <div className="flex flex-col gap-2">
                                             <div className="flex items-center gap-1.5 text-sm text-red-600">
                                                 <AlertTriangle className="w-4 h-4" />
                                                 Failed
                                             </div>
                                             {deployment.deploymentError && (
-                                                <p className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded mt-1">
-                                                    {deployment.deploymentError}
-                                                </p>
+                                                <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2 max-w-md">
+                                                    <p className="text-sm text-red-700">
+                                                        {deployment.deploymentError}
+                                                    </p>
+                                                    <div className="flex gap-2 pt-1">
+                                                        <button
+                                                            onClick={() => router.push(`/clients/${id}/deploy`)}
+                                                            className="text-xs text-red-600 hover:text-red-800 underline"
+                                                        >
+                                                            Retry Deployment
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             )}
                                         </div>
                                     )}

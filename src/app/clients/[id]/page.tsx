@@ -394,9 +394,26 @@ export default function ClientDashboardPage({ params }: { params: Promise<{ id: 
                                     <div className="flex items-center gap-6">
                                         <div className="flex items-center gap-2">
                                             {d.status === "deploying" ? (
-                                                <div className="flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    Deploying
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <div className="flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                        Deploying
+                                                    </div>
+                                                    {d.deploymentProgress && (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <span className="text-xs text-blue-600">
+                                                                {d.deploymentProgress.message || d.deploymentProgress.stage}
+                                                            </span>
+                                                            {d.deploymentProgress.progress >= 0 && (
+                                                                <div className="w-24 h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-blue-500 transition-all duration-300"
+                                                                        style={{ width: `${d.deploymentProgress.progress}%` }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : d.status === "failed" ? (
                                                 <div className="flex flex-col items-end gap-1">

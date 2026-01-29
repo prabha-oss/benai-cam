@@ -71,7 +71,7 @@ export class DeploymentEngine {
                 message: 'Testing connection to n8n instance...',
             });
 
-            const connectionTest = await this.client.testConnection();
+            const connectionTest = await this.retry(() => this.client.testConnection());
             if (!connectionTest.success) {
                 throw new Error(`Failed to connect to n8n: ${connectionTest.message}`);
             }
@@ -119,7 +119,7 @@ export class DeploymentEngine {
                 message: 'Deploying workflow to n8n...',
             });
 
-            const createdWorkflow = await this.client.createWorkflow(workflow);
+            const createdWorkflow = await this.retry(() => this.client.createWorkflow(workflow));
             this.createdWorkflowId = createdWorkflow.id;
 
             this.updateProgress({
@@ -136,7 +136,7 @@ export class DeploymentEngine {
             });
 
             if (createdWorkflow.id) {
-                await this.client.activateWorkflow(createdWorkflow.id);
+                await this.retry(() => this.client.activateWorkflow(createdWorkflow.id!));
             }
 
             // Complete!
@@ -202,7 +202,7 @@ export class DeploymentEngine {
                 data: cred.data,
             };
 
-            const created = await this.client.createCredential(n8nCredential);
+            const created = await this.retry(() => this.client.createCredential(n8nCredential));
 
             if (created.id) {
                 this.createdCredentialIds.push(created.id);
@@ -297,6 +297,78 @@ export class DeploymentEngine {
         if (this.progressCallback) {
             this.progressCallback(progress);
         }
+    }
+
+    /**
+     * Retry operation with exponential backoff
+     * Handles rate limits and transient failures gracefully
+     */
+    private async retry<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+        try {
+            return await operation();
+        } catch (error: any) {
+            const isRetryable = this.isRetryableError(error);
+
+            if (retries > 0 && isRetryable) {
+                const retryDelay = this.getRetryDelay(error, delay);
+                console.warn(`Operation failed, retrying in ${retryDelay}ms... (${retries} attempts left). Error: ${error.message}`);
+
+                this.updateProgress({
+                    stage: this.progressCallback ? 'initializing' : 'deploying',
+                    progress: -1, // Indeterminate
+                    message: `Retrying after transient error... (${retries} attempts left)`,
+                    details: error.message,
+                });
+
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                return this.retry(operation, retries - 1, delay * 2);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Check if an error is retryable (transient)
+     */
+    private isRetryableError(error: any): boolean {
+        const message = error.message?.toLowerCase() || '';
+        const status = error.status;
+
+        // Rate limit errors
+        if (status === 429 || message.includes('rate limit') || message.includes('too many requests')) {
+            return true;
+        }
+
+        // Temporary server errors
+        if (status === 502 || status === 503 || status === 504) {
+            return true;
+        }
+
+        // Network errors
+        if (message.includes('econnreset') || message.includes('etimedout') || message.includes('network')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get appropriate delay for retry based on error type
+     */
+    private getRetryDelay(error: any, baseDelay: number): number {
+        const status = error.status;
+
+        // Rate limit - wait longer
+        if (status === 429) {
+            // Check for Retry-After header hint in error
+            const retryAfter = error.retryAfter;
+            if (retryAfter) {
+                return retryAfter * 1000;
+            }
+            return Math.max(baseDelay, 5000); // At least 5 seconds for rate limits
+        }
+
+        return baseDelay;
     }
 }
 
