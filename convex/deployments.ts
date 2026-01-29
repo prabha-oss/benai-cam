@@ -125,6 +125,13 @@ export const create = mutation({
                 throw new Error("Invalid deployment type");
             }
 
+            // Safely handle credentials - ensure it's an array
+            const rawCredentials = Array.isArray(args.credentials) ? args.credentials : [];
+            const processedCredentials = rawCredentials.map((c: any) => ({
+                ...c,
+                status: (c.status || "active") as "active" | "needs_refresh" | "failed" | "archived"
+            }));
+
             const deploymentId = await ctx.db.insert("deployments", {
                 clientId: args.clientId,
                 agentId: args.agentId,
@@ -135,10 +142,7 @@ export const create = mutation({
                 workflowId: args.workflowId,
                 workflowName: args.workflowName,
                 workflowUrl: "", // Optional
-                credentials: args.credentials.map((c: any) => ({
-                    ...c,
-                    status: c.status as "active" | "needs_refresh" | "failed" | "archived" // casting
-                })),
+                credentials: processedCredentials,
                 status: "deploying", // Start as deploying, action will update to deployed/failed
                 health: {
                     lastChecked: Date.now(),
