@@ -174,7 +174,7 @@ export class DeploymentEngine {
             return {
                 success: false,
                 error: error.message,
-                errorDetails: error,
+                errorDetails: error.toString(),
             };
         }
     }

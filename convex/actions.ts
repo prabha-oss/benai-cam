@@ -171,7 +171,7 @@ export const deployAgentAction = action({
                 .map(c => ({
                     type: c.type,
                     name: `${c.displayName} - ${client.name}`,
-                    data: c.values
+                    data: c.values.credential || c.values
                 }))
         };
 
