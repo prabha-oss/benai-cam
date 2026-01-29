@@ -23,6 +23,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
     const agents = useQuery(api.agents.list);
     const createDeployment = useMutation(api.deployments.create);
     const deployAgentAction = useAction(api.actions.deployAgentAction);
+    const testConnectionAction = useAction(api.actions.testConnection);
 
     // Step state: 1 = select agents, 2 = deployment target, 3 = credentials, 4 = deploying
     const [step, setStep] = useState(1);
@@ -56,11 +57,24 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
 
         setConnectionStatus("testing");
 
-        // Simulate connection test (in real app, would call an API)
-        setTimeout(() => {
-            setConnectionStatus("success");
-            toast.success("Successfully connected to n8n instance!");
-        }, 1500);
+        try {
+            const result = await testConnectionAction({
+                n8nUrl,
+                n8nApiKey
+            });
+
+            if (result.success) {
+                setConnectionStatus("success");
+                toast.success("Successfully connected to n8n instance!");
+            } else {
+                setConnectionStatus("error");
+                toast.error(`Connection failed: ${result.message}`);
+            }
+        } catch (error) {
+            setConnectionStatus("error");
+            toast.error("Failed to test connection");
+            console.error(error);
+        }
     };
 
     const handleNextStep = () => {

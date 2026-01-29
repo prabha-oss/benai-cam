@@ -2,10 +2,28 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 import { performHealthCheck, HealthMonitorConfig } from "../src/lib/deployment/healthMonitor";
-import { deployAgent, DeploymentConfig } from "../src/lib/deployment/deploymentEngine";
+import { deployAgent, DeploymentConfig, testN8nConnection } from "../src/lib/deployment/deploymentEngine";
 import { decrypt } from "../src/lib/crypto/encryption";
+
+// Test n8n connection
+export const testConnection = action({
+    args: {
+        n8nUrl: v.string(),
+        n8nApiKey: v.string(),
+    },
+    handler: async (ctx, args) => {
+        try {
+            return await testN8nConnection(args.n8nUrl, args.n8nApiKey);
+        } catch (error: any) {
+            return {
+                success: false,
+                message: error.message
+            };
+        }
+    },
+});
 
 // Perform health check for a single deployment
 export const performDeploymentHealthCheck = action({
@@ -30,15 +48,29 @@ export const performDeploymentHealthCheck = action({
 
         if (deployment.deploymentType === "client_instance") {
             if (!client.n8nInstanceUrl || !client.n8nApiKey) {
-                throw new Error("Client n8n configuration missing");
+                // If it's a client instance deployment, the deployment record *should* have the credentials
+                // stored in it (as per create mutation). But create mutation stores them in deployment record,
+                // not necessarily on the client record (depending on if we updated client).
+                // Let's check deployment record first (which performDeploymentHealthCheck didn't do before properly)
+
+                // Correction: The deployment record has n8nInstanceUrl and n8nApiKey.
+                if (deployment.n8nInstanceUrl && deployment.n8nApiKey) {
+                    n8nUrl = deployment.n8nInstanceUrl;
+                    apiKey = deployment.n8nApiKey;
+                } else {
+                    throw new Error("Client n8n configuration missing");
+                }
+            } else {
+                n8nUrl = client.n8nInstanceUrl;
+                apiKey = client.n8nApiKey;
             }
-            n8nUrl = client.n8nInstanceUrl;
-            // apiKey = await decrypt(client.n8nApiKey, encryptionKey);
-            apiKey = client.n8nApiKey; // Using raw key for now as encryption setup requires env var
         } else {
-            // "your_instance" - use system env vars
-            n8nUrl = process.env.N8N_INSTANCE_URL || "";
-            apiKey = process.env.N8N_API_KEY || "";
+            // "your_instance" - use settings from DB
+            const settings = await ctx.runQuery(api.settings.getMultiple, {
+                keys: ["n8n_url", "n8n_api_key"]
+            });
+            n8nUrl = settings.n8n_url;
+            apiKey = settings.n8n_api_key;
         }
 
         if (!n8nUrl || !apiKey) {
@@ -95,9 +127,12 @@ export const deployAgentAction = action({
             n8nUrl = deployment.n8nInstanceUrl || "";
             n8nApiKey = deployment.n8nApiKey || "";
         } else {
-            // "your_instance" - use system env vars
-            n8nUrl = process.env.N8N_INSTANCE_URL || process.env.N8N_URL || "";
-            n8nApiKey = process.env.N8N_API_KEY || "";
+            // "your_instance" - use settings from DB
+            const settings = await ctx.runQuery(api.settings.getMultiple, {
+                keys: ["n8n_url", "n8n_api_key"]
+            });
+            n8nUrl = settings.n8n_url;
+            n8nApiKey = settings.n8n_api_key;
         }
 
         // Check if we should run in demo mode (no credentials configured)
@@ -112,33 +147,15 @@ export const deployAgentAction = action({
                 });
                 throw new Error(errorMsg);
             } else {
-                // For managed instance, use demo mode if no credentials
-                isDemoMode = true;
-                console.log("Running in DEMO MODE - no n8n credentials configured");
+                // Managed instances must also have credentials now that we support them
+                const errorMsg = "Managed n8n instance not configured. Please configure it in Settings.";
+                await ctx.runMutation(internal.deployments.updateStatus, {
+                    id: args.deploymentId,
+                    status: "failed",
+                    error: errorMsg
+                });
+                throw new Error(errorMsg);
             }
-        }
-
-        // 4. Handle Demo Mode - simulate successful deployment
-        if (isDemoMode) {
-            const mockWorkflowId = `demo-${Date.now()}`;
-            const mockWorkflowUrl = `https://demo.n8n.cloud/workflow/${mockWorkflowId}`;
-
-            // Simulate a brief delay for realism
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            await ctx.runMutation(internal.deployments.updateStatus, {
-                id: args.deploymentId,
-                status: "deployed",
-                workflowId: mockWorkflowId,
-                workflowUrl: mockWorkflowUrl
-            });
-
-            return {
-                success: true,
-                workflowId: mockWorkflowId,
-                workflowUrl: mockWorkflowUrl,
-                message: "Deployed in DEMO MODE (no n8n credentials configured)"
-            };
         }
 
         // 5. Prepare Deployment Config
