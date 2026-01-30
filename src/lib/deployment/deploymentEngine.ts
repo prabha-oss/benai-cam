@@ -120,6 +120,11 @@ export class DeploymentEngine {
             });
 
             const createdWorkflow = await this.retry(() => this.client.createWorkflow(workflow));
+
+            if (!createdWorkflow.id) {
+                throw new Error("n8n returned a workflow without an ID. Creation might have failed silently.");
+            }
+
             this.createdWorkflowId = createdWorkflow.id;
 
             this.updateProgress({

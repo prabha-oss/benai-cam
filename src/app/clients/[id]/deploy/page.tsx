@@ -33,6 +33,7 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
 
     // Credential values state
     const [credentialValues, setCredentialValues] = useState<Record<string, any>>({});
+    const [workflowNames, setWorkflowNames] = useState<Record<string, string>>({}); // New: Store custom names
 
     // Deployment target config
     const [deploymentType, setDeploymentType] = useState<"your_instance" | "client_instance">("your_instance");
@@ -205,8 +206,9 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                     clientId,
                     agentId: agentId as Id<"agents">,
                     deploymentType: deploymentType,
+                    deploymentType: deploymentType,
                     workflowId: "",
-                    workflowName: `${agentName} - ${client?.name}`,
+                    workflowName: workflowNames[agentId] || `${agentName} - ${client?.name}`,
                     credentials: formattedCredentials,
                     // Pass n8n config for client_instance deployments
                     n8nUrl: deploymentType === "client_instance" ? n8nUrl : undefined,
@@ -478,6 +480,22 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                                         <Zap className="w-4 h-4 text-blue-600" />
                                         {agent.name}
                                     </h4>
+
+                                    {/* Workflow Name Configuration */}
+                                    <div className="bg-white border rounded-lg p-4 space-y-2">
+                                        <Label>Workflow Name</Label>
+                                        <Input
+                                            value={workflowNames[agentId] || `${agent.name} - ${client?.name}`}
+                                            onChange={(e) => setWorkflowNames(prev => ({
+                                                ...prev,
+                                                [agentId]: e.target.value
+                                            }))}
+                                            placeholder="e.g. My Agent Workflow"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            This name will be used for the workflow in n8n.
+                                        </p>
+                                    </div>
 
                                     {allCredentials.map((cred, credIndex) => {
                                         const instances = [];

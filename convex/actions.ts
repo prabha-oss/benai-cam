@@ -311,7 +311,9 @@ export const deployAgentAction = action({
             n8nUrl,
             n8nApiKey,
             templateJSON: agent.templateJSON,
-            workflowName: `${agent.name} - ${client.name}`,
+            templateJSON: agent.templateJSON,
+            workflowName: deployment.workflowName || `${agent.name} - ${client.name}`, // Use stored name or fallback
+            credentials: filteredCredentials
             credentials: filteredCredentials
         };
 
