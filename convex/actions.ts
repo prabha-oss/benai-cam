@@ -314,7 +314,6 @@ export const deployAgentAction = action({
             templateJSON: agent.templateJSON,
             workflowName: deployment.workflowName || `${agent.name} - ${client.name}`, // Use stored name or fallback
             credentials: filteredCredentials
-            credentials: filteredCredentials
         };
 
         // 7. Run Deployment with throttled progress updates
