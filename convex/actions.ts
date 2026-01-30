@@ -315,18 +315,33 @@ export const deployAgentAction = action({
             credentials: filteredCredentials
         };
 
-        // 6. Run Deployment
+        // 7. Run Deployment with throttled progress updates
+        // Throttle progress updates to avoid OptimisticConcurrencyControlFailure
+        let lastProgressUpdate = 0;
+        let lastStage = "";
+        const THROTTLE_MS = 500; // Minimum 500ms between progress updates
+
         try {
             const result = await deployAgent(config, async (progress) => {
                 console.log(`Deployment Progress: ${progress.stage} ${progress.progress}%`);
-                // Update progress in DB
-                await ctx.runMutation(internal.deployments.updateProgress, {
-                    id: args.deploymentId,
-                    stage: progress.stage,
-                    progress: progress.progress,
-                    message: progress.message,
-                    details: progress.details
-                });
+
+                const now = Date.now();
+                const stageChanged = progress.stage !== lastStage;
+                const throttleExpired = (now - lastProgressUpdate) >= THROTTLE_MS;
+
+                // Only update DB if stage changed OR throttle expired OR it's a completion/failure
+                if (stageChanged || throttleExpired || progress.stage === 'completed' || progress.stage === 'failed') {
+                    lastProgressUpdate = now;
+                    lastStage = progress.stage;
+
+                    await ctx.runMutation(internal.deployments.updateProgress, {
+                        id: args.deploymentId,
+                        stage: progress.stage,
+                        progress: progress.progress,
+                        message: progress.message,
+                        details: progress.details
+                    });
+                }
             });
 
             if (result.success) {

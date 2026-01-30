@@ -218,6 +218,8 @@ export const updateHealth = internalMutation({
 });
 
 // Update deployment progress (internal use by actions)
+// NOTE: Do NOT update updatedAt here to avoid OptimisticConcurrencyControlFailure
+// during rapid progress updates. updatedAt is only set in updateStatus.
 export const updateProgress = internalMutation({
     args: {
         id: v.id("deployments"),
@@ -233,8 +235,8 @@ export const updateProgress = internalMutation({
                 progress: args.progress,
                 message: args.message,
                 details: args.details
-            },
-            updatedAt: Date.now()
+            }
+            // updatedAt intentionally omitted to prevent concurrency conflicts
         });
     }
 });
