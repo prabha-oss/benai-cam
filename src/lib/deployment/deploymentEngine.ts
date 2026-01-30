@@ -151,10 +151,13 @@ export class DeploymentEngine {
                 message: 'Deployment completed successfully!',
             });
 
+            const workflowUrl = `${this.config.n8nUrl}/workflow/${createdWorkflow.id}`;
+            console.log("[DeploymentEngine] Deployment complete. workflowId:", createdWorkflow.id, "workflowUrl:", workflowUrl);
+
             return {
                 success: true,
                 workflowId: createdWorkflow.id,
-                workflowUrl: `${this.config.n8nUrl}/workflow/${createdWorkflow.id}`,
+                workflowUrl: workflowUrl,
                 credentialIds: this.createdCredentialIds,
             };
 

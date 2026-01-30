@@ -188,9 +188,15 @@ export const updateStatus = internalMutation({
         };
 
         if (args.error) updates.deploymentError = args.error;
-        if (args.workflowId) updates.workflowId = args.workflowId;
-        if (args.workflowUrl) updates.workflowUrl = args.workflowUrl;
+        // Use !== undefined to allow empty strings (though they shouldn't happen)
+        if (args.workflowId !== undefined && args.workflowId !== "") {
+            updates.workflowId = args.workflowId;
+        }
+        if (args.workflowUrl !== undefined && args.workflowUrl !== "") {
+            updates.workflowUrl = args.workflowUrl;
+        }
 
+        console.log("updateStatus: saving updates", JSON.stringify(updates));
         await ctx.db.patch(args.id, updates);
     }
 });

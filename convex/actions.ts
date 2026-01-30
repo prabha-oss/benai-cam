@@ -345,10 +345,16 @@ export const deployAgentAction = action({
             });
 
             if (result.success) {
+                console.log("Deployment succeeded, workflowId:", result.workflowId, "workflowUrl:", result.workflowUrl);
+
+                if (!result.workflowId) {
+                    console.error("WARNING: Deployment succeeded but no workflowId returned!");
+                }
+
                 await ctx.runMutation(internal.deployments.updateStatus, {
                     id: args.deploymentId,
                     status: "deployed",
-                    workflowId: result.workflowId || "",
+                    workflowId: result.workflowId,  // Pass actual value, not empty string fallback
                     workflowUrl: result.workflowUrl
                 });
             } else {
