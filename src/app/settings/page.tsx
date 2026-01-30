@@ -57,7 +57,7 @@ export default function SettingsPage() {
             if (result.success) {
                 setIsTesting(false);
                 setIsTested(true);
-                toast.success("Connection successful! Version: " + (result.version || "Unknown"));
+                toast.success("Connection successful!");
             } else {
                 throw new Error(result.message);
             }
