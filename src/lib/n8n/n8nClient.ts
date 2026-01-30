@@ -176,7 +176,7 @@ export class N8nClient {
     /**
      * Get all workflows
      */
-    async getWorkflows(active?: boolean, limit: number = 100): Promise<N8nWorkflow[]> {
+    async getWorkflows(active?: boolean, limit: number = 250): Promise<N8nWorkflow[]> {
         let url = `${this.baseUrl}/api/v1/workflows?limit=${limit}`;
         if (active !== undefined) {
             url += `&active=${active}`;

@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ workflow });
         }
 
-        // Fetch all workflows (limit to 500 to ensure we get most of them)
-        const response = await fetch(`${baseUrl}/api/v1/workflows?limit=500`, {
+        // Fetch all workflows (limit to 250 to comply with n8n max limit)
+        const response = await fetch(`${baseUrl}/api/v1/workflows?limit=250`, {
             method: "GET",
             headers: {
                 "X-N8N-API-KEY": n8nApiKey,
