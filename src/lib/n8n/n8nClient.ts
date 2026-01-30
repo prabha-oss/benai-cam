@@ -120,13 +120,16 @@ export class N8nClient {
             throw this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        return data.data || data;
     }
 
     /**
      * Create a new credential
      */
     async createCredential(credential: N8nCredential): Promise<N8nCredential> {
+        console.log("[n8nClient] createCredential request:", credential.name, credential.type);
+
         const response = await fetch(`${this.baseUrl}/api/v1/credentials`, {
             method: 'POST',
             headers: this.headers,
@@ -137,7 +140,10 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        const result = data.data || data;
+        console.log("[n8nClient] createCredential response - id:", result.id, "name:", result.name);
+        return result;
     }
 
     /**
@@ -154,7 +160,8 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        return data.data || data;
     }
 
     /**
@@ -208,13 +215,16 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        return data.data || data;
     }
 
     /**
      * Create a new workflow
      */
     async createWorkflow(workflow: Omit<N8nWorkflow, 'id'>): Promise<N8nWorkflow> {
+        console.log("[n8nClient] createWorkflow request:", workflow.name);
+
         const response = await fetch(`${this.baseUrl}/api/v1/workflows`, {
             method: 'POST',
             headers: this.headers,
@@ -225,7 +235,15 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        const result = data.data || data;
+        console.log("[n8nClient] createWorkflow response - id:", result.id, "name:", result.name);
+
+        if (!result.id) {
+            console.error("[n8nClient] WARNING: createWorkflow response has no id! Full response:", JSON.stringify(data));
+        }
+
+        return result;
     }
 
     /**
@@ -242,7 +260,8 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        return data.data || data;
     }
 
     /**
@@ -263,6 +282,8 @@ export class N8nClient {
      * Activate a workflow
      */
     async activateWorkflow(id: string): Promise<N8nWorkflow> {
+        console.log("[n8nClient] activateWorkflow:", id);
+
         const response = await fetch(`${this.baseUrl}/api/v1/workflows/${id}/activate`, {
             method: 'POST',
             headers: this.headers,
@@ -272,7 +293,10 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        const result = data.data || data;
+        console.log("[n8nClient] activateWorkflow response - active:", result.active);
+        return result;
     }
 
     /**
@@ -288,7 +312,8 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        return data.data || data;
     }
 
     // ================== Executions ==================
@@ -328,7 +353,8 @@ export class N8nClient {
             throw await this.handleError(response);
         }
 
-        return response.json();
+        const data = await response.json();
+        return data.data || data;
     }
 
     // ================== Health Check ==================
