@@ -401,7 +401,7 @@ export default function NewAgentPage() {
                                     <div className="space-y-4 mb-6">
                                         <h4 className="text-sm font-semibold uppercase tracking-wider text-gray-500">Simple Match (One-to-All)</h4>
                                         {parsedSchema.simple.map((cred, index) => (
-                                            <div key={`${cred.type}-${index}`} className="flex items-start gap-3 p-3 border rounded-md bg-gray-50">
+                                            <div key={`${cred.type}-${index}`} className={`flex items-start gap-3 p-3 border rounded-md ${cred.isOAuth ? 'bg-amber-50 border-amber-200' : 'bg-gray-50'}`}>
                                                 <Checkbox checked disabled />
                                                 <div className="flex-1">
                                                     <div className="flex justify-between items-center">
@@ -457,6 +457,11 @@ export default function NewAgentPage() {
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1">Type: {cred.type}</p>
+                                                    {cred.isOAuth && (
+                                                        <p className="text-xs text-amber-700 mt-1 font-medium">
+                                                            ⚠️ OAuth - {cred.oAuthNote || "Requires OAuth flow in n8n after deployment"}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}

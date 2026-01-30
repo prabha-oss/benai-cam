@@ -17,8 +17,52 @@ const ERROR_REMEDIATION: Record<string, string> = {
     "ECONNREFUSED": "n8n instance is not reachable. Check if it's running and the URL is correct.",
     "rate limit": "Too many requests. Wait a moment and try again.",
     "request/body/data must be object": "Credential format error. Please check the credential values are properly formatted.",
+    "request.body.data does not match": "Credential field mismatch. The agent's credential schema may need to be updated to match n8n's requirements.",
+    "requires property": "Missing required credential field. Update the agent's credential schema with all required fields for this credential type.",
     "Workflow validation failed": "The workflow template has errors. Contact support or check the agent configuration.",
 };
+
+/**
+ * Known n8n credential field requirements
+ * Used for validation before sending to n8n API
+ */
+const CREDENTIAL_FIELD_REQUIREMENTS: Record<string, string[]> = {
+    'openAiApi': ['apiKey'],
+    'anthropicApi': ['apiKey'],
+    'apifyApi': ['apiToken'],
+    'airtableTokenApi': ['accessToken'],
+    'telegramApi': ['accessToken'],
+    'notionApi': ['apiKey'],
+    'supabaseApi': ['host', 'serviceRoleSecret'],
+    'httpHeaderAuth': ['name', 'value'],
+    'httpBasicAuth': ['user', 'password'],
+    'stripeApi': ['apiKey'],
+    'sendGridApi': ['apiKey'],
+    'gitHubApi': ['accessToken'],
+    'hubspotApi': ['apiKey'],
+    'slackOAuth2Api': ['clientId', 'clientSecret'],
+    'googleSheetsOAuth2Api': ['clientId', 'clientSecret'],
+    'googleDriveOAuth2Api': ['clientId', 'clientSecret'],
+};
+
+/**
+ * Validate credential data has required fields for n8n
+ */
+function validateCredentialFields(type: string, data: Record<string, any>): { valid: boolean; missingFields: string[] } {
+    const requiredFields = CREDENTIAL_FIELD_REQUIREMENTS[type];
+
+    if (!requiredFields) {
+        // Unknown type, skip validation
+        return { valid: true, missingFields: [] };
+    }
+
+    const missingFields = requiredFields.filter(field => !data[field] || data[field] === '');
+
+    return {
+        valid: missingFields.length === 0,
+        missingFields
+    };
+}
 
 /**
  * Get actionable error message with remediation advice
@@ -314,14 +358,49 @@ export const deployAgentAction = action({
                     console.error(`[Credential ${c.displayName}] WARNING: No valid credential data to send to n8n!`);
                 }
 
+                // Validate required fields for known credential types
+                const validation = validateCredentialFields(c.type, normalizedData);
+                if (!validation.valid) {
+                    console.error(`[Credential ${c.displayName}] Missing required fields: ${validation.missingFields.join(', ')}`);
+                    console.error(`[Credential ${c.displayName}] Provided fields: ${Object.keys(normalizedData).join(', ')}`);
+                }
+
                 return {
                     type: c.type,
                     name: `${c.displayName} - ${client.name}`,
-                    data: normalizedData
+                    data: normalizedData,
+                    _missingFields: validation.missingFields // Include for error reporting
                 };
             }));
 
         console.log("Filtered credentials:", JSON.stringify(filteredCredentials, null, 2));
+
+        // Pre-flight validation: Check for credentials with missing required fields
+        const credentialsWithMissingFields = filteredCredentials.filter(
+            (c: any) => c._missingFields && c._missingFields.length > 0
+        );
+
+        if (credentialsWithMissingFields.length > 0) {
+            const errorDetails = credentialsWithMissingFields.map((c: any) =>
+                `${c.name}: missing ${c._missingFields.join(', ')}`
+            ).join('; ');
+
+            const errorMsg = `Credential configuration error: ${errorDetails}. Please update the agent's credential schema to include all required fields for n8n.`;
+            console.error("[Deployment] Pre-flight validation failed:", errorMsg);
+
+            await ctx.runMutation(internal.deployments.updateStatus, {
+                id: args.deploymentId,
+                status: "failed",
+                error: errorMsg
+            });
+            throw new Error(errorMsg);
+        }
+
+        // Remove internal validation metadata before passing to deployment engine
+        const cleanCredentials = filteredCredentials.map((c: any) => {
+            const { _missingFields, ...rest } = c;
+            return rest;
+        });
 
         const config: DeploymentConfig = {
             clientId: client._id,
@@ -330,7 +409,7 @@ export const deployAgentAction = action({
             n8nApiKey,
             templateJSON: agent.templateJSON,
             workflowName: deployment.workflowName || `${agent.name} - ${client.name}`, // Use stored name or fallback
-            credentials: filteredCredentials
+            credentials: cleanCredentials
         };
 
         // 7. Run Deployment with throttled progress updates

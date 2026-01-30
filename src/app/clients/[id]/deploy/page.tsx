@@ -518,6 +518,22 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                                                         </span>
                                                     </div>
 
+                                                    {/* OAuth Warning */}
+                                                    {(cred as any).isOAuth && (
+                                                        <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-3">
+                                                            <div className="flex items-start gap-2">
+                                                                <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                                                <div className="text-xs text-amber-800">
+                                                                    <p className="font-medium">OAuth Credential</p>
+                                                                    <p className="mt-1">
+                                                                        {(cred as any).oAuthNote ||
+                                                                         "This credential requires OAuth authorization. After deployment, you'll need to complete the OAuth flow in n8n."}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
                                                     {cred.fields.map(field => (
                                                         <div key={field.name} className="space-y-1.5">
                                                             <Label className="text-xs">
@@ -525,6 +541,8 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                                                                 {field.required && <span className="text-red-500 ml-1">*</span>}
                                                             </Label>
                                                             <Input
+                                                                id={`${key}-${field.name}`}
+                                                                name={`${key}-${field.name}`}
                                                                 type={field.type === "password" ? "password" : "text"}
                                                                 value={values[field.name] || field.default || ""}
                                                                 onChange={(e) => {
