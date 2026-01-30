@@ -205,8 +205,6 @@ export default function DeployAgentPage({ params }: { params: Promise<{ id: stri
                 const response = await createDeployment({
                     clientId,
                     agentId: agentId as Id<"agents">,
-                    clientId,
-                    agentId: agentId as Id<"agents">,
                     deploymentType: deploymentType,
                     workflowId: "",
                     workflowName: workflowNames[agentId] || `${agentName} - ${client?.name}`,
