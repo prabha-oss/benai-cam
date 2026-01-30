@@ -70,24 +70,32 @@ function validateTemplateJSON(template: any): { valid: boolean; error?: string }
 
 /**
  * Ensure credential data is properly structured as an object
+ * IMPORTANT: We pass through the data as-is to respect the field names
+ * defined in the agent's credential schema. n8n requires specific field
+ * names for each credential type (e.g., accessToken, clientId, etc.)
  */
 function normalizeCredentialData(data: any): Record<string, any> {
     if (data === null || data === undefined) {
         return {};
     }
 
-    // If it's already a proper object (not array, not primitive)
+    // If it's already a proper object (not array, not primitive), return as-is
     if (typeof data === 'object' && !Array.isArray(data)) {
         return data;
     }
 
-    // If it's a string (maybe a single API key), wrap it
+    // If it's a string, this is likely an error in the credential schema
+    // The agent schema should define proper field names that match n8n's expected fields
+    // Log a warning but don't blindly wrap it - return empty to fail gracefully
     if (typeof data === 'string') {
-        return { apiKey: data };
+        console.warn("[normalizeCredentialData] Received string instead of object. This suggests the credential schema may be misconfigured.", data.substring(0, 50));
+        // Return empty - better to fail with clear error than corrupt data
+        return {};
     }
 
-    // For arrays or other types, wrap in a data field
-    return { value: data };
+    // For arrays or other types, return empty
+    console.warn("[normalizeCredentialData] Received unexpected data type:", typeof data);
+    return {};
 }
 
 // Test n8n connection
@@ -278,7 +286,9 @@ export const deployAgentAction = action({
         const filteredCredentials = await Promise.all((deployment.credentials || [])
             .filter((c: DeploymentCredential) => (c.values && Object.keys(c.values).length > 0) || c.encryptedValue)
             .map(async (c: DeploymentCredential) => {
-                let data = c.values?.credential || c.values;
+                // Use the values directly - don't unwrap nested 'credential' field
+                // The field names in c.values should match what n8n expects for this credential type
+                let data = c.values;
 
                 if (c.encryptedValue) {
                     if (!encryptionKey) {
@@ -292,9 +302,17 @@ export const deployAgentAction = action({
                     }
                 }
 
+                // Log the raw data for debugging
+                console.log(`[Credential ${c.displayName}] type: ${c.type}, raw data:`, JSON.stringify(data, null, 2));
+
                 // Ensure credential data is properly structured as an object
                 const normalizedData = normalizeCredentialData(data);
-                console.log(`Credential ${c.displayName} normalized data:`, JSON.stringify(normalizedData, null, 2));
+                console.log(`[Credential ${c.displayName}] normalized data:`, JSON.stringify(normalizedData, null, 2));
+
+                // Validate that we have some data
+                if (Object.keys(normalizedData).length === 0) {
+                    console.error(`[Credential ${c.displayName}] WARNING: No valid credential data to send to n8n!`);
+                }
 
                 return {
                     type: c.type,

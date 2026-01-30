@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Server, Shield, Save, CheckCircle, Loader2, Edit, AlertTriangle, Bell } from "lucide-react";
 import { toast } from "sonner";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 export default function SettingsPage() {
     const settings = useQuery(api.settings.getMultiple, { keys: ["n8n_url", "n8n_api_key"] });
     const saveSettings = useMutation(api.settings.setMultiple);
+    const testConnectionAction = useAction(api.actions.testConnection);
 
     const [n8nUrl, setN8nUrl] = useState("");
     const [n8nApiKey, setN8nApiKey] = useState("");
@@ -47,19 +48,23 @@ export default function SettingsPage() {
             // Check if the URL is valid
             new URL(n8nUrl);
 
-            // In a real scenario, we would ping a proxy endpoint to verify credentials.
-            // For now, we'll assume they are correct if the format is valid.
-            // You could implement a /api/n8n/test endpoint if needed.
+            // Call the real action
+            const result = await testConnectionAction({
+                n8nUrl,
+                n8nApiKey
+            });
 
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate check
-
-            setIsTesting(false);
-            setIsTested(true);
-            toast.success("Connection test successful!");
-        } catch (e) {
+            if (result.success) {
+                setIsTesting(false);
+                setIsTested(true);
+                toast.success("Connection successful! Version: " + (result.version || "Unknown"));
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (e: any) {
             setIsTesting(false);
             setIsTested(false);
-            toast.error("Invalid URL format");
+            toast.error(e.message || "Connection failed. Check URL and API Key.");
         }
     };
 
